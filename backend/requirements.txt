@@ -1,0 +1,31 @@
+# ── API server ───────────────────────────────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.30.0
+pydantic==2.7.0
+python-multipart==0.0.9
+
+# ── Core ML / embeddings ─────────────────────────────────────────────────────
+sentence-transformers==2.7.0
+faiss-cpu==1.8.0
+
+# ── NLP ───────────────────────────────────────────────────────────────────────
+spacy==3.8.7
+# After install, download the small English model:
+#   python -m spacy download en_core_web_sm
+
+# ── Document parsing ─────────────────────────────────────────────────────────
+python-docx==1.1.0
+
+# ── Data ─────────────────────────────────────────────────────────────────────
+pandas==2.2.0
+numpy==1.26.0
+
+# ── Ranking model ────────────────────────────────────────────────────────────
+lightgbm==4.3.0
+scikit-learn==1.4.0
+
+# ── Utilities ────────────────────────────────────────────────────────────────
+tqdm==4.66.0
+orjson==3.10.7   # fast JSONL parsing — ~3-5x faster than stdlib json on the
+                  # 100k+ row candidates.jsonl file (optional: code falls back
+                  # to stdlib json automatically if this isn't installed)

@@ -29,7 +29,7 @@ class RunRequest(BaseModel):
         default=None, description="Override path to candidates.jsonl"
     )
     faiss_k: int = Field(
-        default=2000, ge=10, le=20000,
+        default=300, ge=10, le=20000,
         description="Number of candidates retrieved from FAISS before re-scoring",
     )
     top_n: int = Field(
@@ -40,7 +40,7 @@ class RunRequest(BaseModel):
         default=False, description="Ignore embedding cache and re-encode from scratch"
     )
     use_lgbm: bool = Field(
-        default=True, description="Apply LightGBM re-ranking if a model file exists"
+        default=False, description="Apply LightGBM re-ranking if a model file exists"
     )
 
 

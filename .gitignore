@@ -1,0 +1,41 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+backend/env/
+backend/venv/
+
+# Output files
+output/*.csv
+output/*.faiss
+output/*.npy
+
+# Data files
+data/*.jsonl
+data/*.docx
+
+# Model files
+models/*.lgb
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Environment variables
+.env
+.env.*
+
+# Logs
+*.log
+
+# Python cache
+__pycache__/
+*.py[cod]

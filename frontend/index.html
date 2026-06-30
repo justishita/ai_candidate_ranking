@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RedRob — AI Candidate Ranking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1A1918;--card:#222120;--card2:#282725;--card3:#302E2B;
+  --border-c:rgba(245,244,238,0.10);--border-s:rgba(245,244,238,0.06);
+  --indigo:#D97757;--indigo-dim:rgba(217,119,87,0.16);--indigo-glow:rgba(217,119,87,0.30);
+  --amber:#D9A356;--green:#6FBF8B;--red:#E2685B;--slate:#9C9A91;
+  --text:#F4F2EC;--muted:#9C9A91;--muted2:#6E6C64;
+  --serif:'DM Serif Display',serif;--sans:'Inter',sans-serif;
+  --radius:8px;--radius-lg:12px;
+}
+html,body{height:100%;background:var(--navy);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--muted2);border-radius:3px}
+
+/* ══════════════════ LAYOUT ══════════════════ */
+.app{display:grid;grid-template-rows:52px 1fr;grid-template-columns:260px 1fr;height:100vh;overflow:hidden}
+.topbar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:rgba(34,33,32,0.92);border-bottom:0.5px solid var(--border-c);backdrop-filter:blur(12px);z-index:10}
+.sidebar{grid-row:2;border-right:0.5px solid var(--border-c);background:rgba(26,25,24,0.75);overflow-y:auto;display:flex;flex-direction:column}
+.main{grid-row:2;overflow-y:auto;display:flex;flex-direction:column}
+
+/* ══════════════════ TOPBAR ══════════════════ */
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo-mark{width:30px;height:30px;background:var(--indigo);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#fff}
+.logo-text{font-family:var(--serif);font-size:18px;color:var(--text)}
+.top-center{display:flex;align-items:center;gap:6px;background:rgba(217,119,87,0.08);border:0.5px solid var(--border-c);border-radius:6px;padding:5px 12px;font-size:12px;color:var(--muted)}
+.top-center i{color:var(--indigo)}
+.top-right{display:flex;align-items:center;gap:12px}
+.badge{padding:3px 9px;border-radius:4px;font-size:11px;font-weight:500}
+.badge-live{background:rgba(16,185,129,0.15);color:#6FBF8B;border:0.5px solid rgba(16,185,129,0.3)}
+.badge-warn{background:rgba(245,158,11,0.15);color:#D9A356;border:0.5px solid rgba(245,158,11,0.3)}
+.top-avatar{width:28px;height:28px;border-radius:50%;background:var(--indigo-dim);border:0.5px solid var(--border-c);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:#F0A37C;cursor:pointer}
+
+/* ══════════════════ SIDEBAR ══════════════════ */
+.sidebar-section{padding:16px 14px 8px;font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:0.09em}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 14px;font-size:13px;color:var(--muted);cursor:pointer;border-radius:0;transition:background 0.12s;text-decoration:none;border-left:2px solid transparent}
+.nav-item i{font-size:16px;width:18px;flex-shrink:0}
+.nav-item:hover{background:rgba(217,119,87,0.07);color:var(--text)}
+.nav-item.active{background:var(--indigo-dim);color:#F2B294;border-left-color:var(--indigo)}
+.sidebar-divider{margin:8px 14px;height:0.5px;background:var(--border-c)}
+
+.jd-card{margin:12px;background:var(--card);border:0.5px solid var(--border-c);border-radius:var(--radius-lg);padding:12px}
+.jd-card-label{font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px}
+.jd-card-title{font-family:var(--serif);font-size:15px;color:var(--text);margin-bottom:8px;line-height:1.3}
+.jd-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:500;margin:2px 2px 2px 0}
+.jd-tag-ind{background:var(--indigo-dim);color:#F0A37C;border:0.5px solid rgba(217,119,87,0.3)}
+.jd-tag-amb{background:rgba(245,158,11,0.1);color:#D9A356;border:0.5px solid rgba(245,158,11,0.25)}
+.jd-tag-grn{background:rgba(16,185,129,0.1);color:#6FBF8B;border:0.5px solid rgba(16,185,129,0.25)}
+.jd-skills{margin-top:8px;display:flex;flex-wrap:wrap;gap:3px}
+.skill-pill{padding:2px 6px;border-radius:3px;font-size:10px;background:rgba(139,156,200,0.1);color:var(--muted);border:0.5px solid rgba(139,156,200,0.15)}
+.skill-pill.required{background:var(--indigo-dim);color:#F0A37C;border-color:rgba(217,119,87,0.25)}
+
+.weight-block{margin:0 12px 12px;background:var(--card);border:0.5px solid var(--border-c);border-radius:var(--radius-lg);padding:12px}
+.weight-block-label{font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px}
+.weight-row2{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.wr-name{font-size:11px;color:var(--muted);width:68px;flex-shrink:0}
+.wr-track{flex:1;height:4px;background:rgba(245,244,238,0.08);border-radius:2px;overflow:hidden}
+.wr-fill{height:100%;border-radius:2px}
+.wr-pct{font-size:10px;color:var(--muted2);width:26px;text-align:right;flex-shrink:0}
+
+.sidebar-footer{margin-top:auto;padding:12px 14px;border-top:0.5px solid var(--border-c)}
+.run-btn{width:100%;background:var(--indigo);color:#fff;border:none;border-radius:var(--radius);padding:9px;font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.15s}
+.run-btn:hover{background:#E8916C}
+.run-time{text-align:center;font-size:10px;color:var(--muted2);margin-top:6px}
+
+/* ══════════════════ MAIN CONTENT ══════════════════ */
+.main-header{padding:18px 22px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-shrink:0}
+.mh-left{}
+.mh-eyebrow{font-size:11px;color:var(--muted);margin-bottom:3px}
+.mh-title{font-family:var(--serif);font-size:24px;color:var(--text);line-height:1.15}
+.mh-sub{font-size:12px;color:var(--muted);margin-top:4px}
+.kpi-row{display:flex;gap:10px;flex-shrink:0}
+.kpi{background:var(--card);border:0.5px solid var(--border-c);border-radius:10px;padding:10px 14px;text-align:center;min-width:76px}
+.kpi-val{font-size:22px;font-weight:500;color:var(--text);line-height:1;font-variant-numeric:tabular-nums}
+.kpi-val.ind{color:#F0A37C}
+.kpi-val.amb{color:#D9A356}
+.kpi-lbl{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:0.06em}
+
+/* Pipeline progress */
+.pipeline{padding:14px 22px 0;flex-shrink:0}
+.pipeline-label{font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px}
+.pipeline-steps{display:flex;align-items:center;gap:0}
+.ps{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:5px;font-size:11px;cursor:default}
+.ps.done{color:#6FBF8B}
+.ps.done i.status{color:#6FBF8B}
+.ps.active{background:var(--indigo-dim);color:#F0A37C}
+.ps.active i.status{color:#F0A37C}
+.ps.idle{color:var(--muted2)}
+.ps-conn{width:18px;height:0.5px;background:var(--border-c);flex-shrink:0}
+.ps i.status{font-size:13px}
+.ps-name{font-size:10px;white-space:nowrap}
+
+/* Toolbar */
+.toolbar{padding:12px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;border-bottom:0.5px solid var(--border-s)}
+.tool-left{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.search-wrap{position:relative;display:flex;align-items:center}
+.search-wrap i{position:absolute;left:9px;font-size:14px;color:var(--muted);pointer-events:none}
+.search-input{background:var(--card);border:0.5px solid var(--border-c);color:var(--text);font-family:var(--sans);font-size:12px;padding:6px 10px 6px 28px;border-radius:6px;width:190px;outline:none}
+.search-input::placeholder{color:var(--muted2)}
+.search-input:focus{border-color:var(--indigo)}
+.sort-select{background:var(--card);border:0.5px solid var(--border-c);color:var(--muted);font-family:var(--sans);font-size:11px;padding:5px 10px;border-radius:6px;outline:none;cursor:pointer}
+.sort-select:focus{border-color:var(--indigo);color:var(--text)}
+.filter-btn{background:var(--card);border:0.5px solid var(--border-c);color:var(--muted);font-family:var(--sans);font-size:11px;padding:5px 11px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.filter-btn:hover{border-color:rgba(217,119,87,0.4);color:var(--text)}
+.filter-btn.active{background:var(--indigo-dim);border-color:rgba(217,119,87,0.4);color:#F0A37C}
+.tool-right{font-size:11px;color:var(--muted);flex-shrink:0}
+.tool-right b{color:var(--text);font-weight:500}
+
+/* Candidate list */
+.cand-list{flex:1;padding:10px 22px 22px;display:flex;flex-direction:column;gap:8px}
+
+/* Candidate card */
+.cand-card{background:var(--card);border:0.5px solid var(--border-c);border-radius:var(--radius-lg);padding:14px 16px;cursor:pointer;transition:border-color 0.15s,background 0.15s;position:relative}
+.cand-card:hover{border-color:rgba(217,119,87,0.4)}
+.cand-card.expanded{border-color:var(--indigo);background:var(--card2)}
+.cand-card.rank1{border-left:2.5px solid var(--amber)}
+.cand-card.rank2{border-left:2.5px solid #94a3b8}
+.cand-card.rank3{border-left:2.5px solid #b45309}
+
+.card-top{display:flex;align-items:flex-start;gap:12px}
+.rank-col{display:flex;flex-direction:column;align-items:center;width:36px;flex-shrink:0;padding-top:2px}
+.rank-medal{font-size:16px;line-height:1;margin-bottom:4px}
+.ring-wrap{width:44px;height:44px;flex-shrink:0;position:relative}
+.ring-wrap canvas{display:block}
+
+.card-body{flex:1;min-width:0}
+.cand-name-line{display:flex;align-items:center;gap:8px;margin-bottom:2px;flex-wrap:wrap}
+.cand-name{font-size:14px;font-weight:500;color:var(--text)}
+.cand-badge{padding:1px 7px;border-radius:3px;font-size:10px;font-weight:500}
+.cb-new{background:rgba(16,185,129,0.13);color:#6FBF8B;border:0.5px solid rgba(16,185,129,0.25)}
+.cb-phd{background:rgba(139,92,246,0.13);color:#c4b5fd;border:0.5px solid rgba(139,92,246,0.25)}
+.cb-hot{background:rgba(245,158,11,0.13);color:#D9A356;border:0.5px solid rgba(245,158,11,0.25)}
+.cand-role{font-size:12px;color:var(--muted);margin-bottom:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.skill-row{display:flex;flex-wrap:wrap;gap:4px}
+.sc{padding:2px 7px;border-radius:3px;font-size:10px;font-weight:500}
+.sc-match{background:var(--indigo-dim);color:#F0A37C;border:0.5px solid rgba(217,119,87,0.28)}
+.sc-soft{background:rgba(139,156,200,0.09);color:var(--muted);border:0.5px solid rgba(139,156,200,0.14)}
+
+.card-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
+.final-score{font-size:21px;font-weight:500;color:var(--text);line-height:1;font-variant-numeric:tabular-nums}
+.score-sub{font-size:10px;color:var(--muted);font-weight:400}
+.meta-row{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+.meta-dot{width:3px;height:3px;border-radius:50%;background:var(--muted2)}
+
+/* Expanded detail */
+.card-detail{margin-top:13px;padding-top:13px;border-top:0.5px solid rgba(217,119,87,0.14)}
+.detail-tabs{display:flex;gap:2px;margin-bottom:12px}
+.dtab{padding:4px 10px;border-radius:4px;font-size:11px;color:var(--muted);cursor:pointer;border:0.5px solid transparent}
+.dtab.active{background:var(--indigo-dim);color:#F0A37C;border-color:rgba(217,119,87,0.3)}
+.dtab:hover:not(.active){background:rgba(217,119,87,0.06);color:var(--text)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+.score-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.sg-cell{background:rgba(15,22,41,0.55);border-radius:7px;padding:8px 10px;border:0.5px solid rgba(217,119,87,0.1)}
+.sg-cell.highlight{background:rgba(245,158,11,0.07);border-color:rgba(245,158,11,0.2)}
+.sg-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px}
+.sg-label.gold{color:#F59E0B}
+.sg-val{font-size:14px;font-weight:500;color:var(--text);font-variant-numeric:tabular-nums}
+.sg-val.gold{color:#F59E0B}
+.sg-bar{margin-top:5px;height:3px;border-radius:2px;background:rgba(217,119,87,0.12)}
+.sg-fill{height:100%;border-radius:2px;background:var(--indigo)}
+.sg-fill.gold{background:#F59E0B}
+
+.reason-box{padding:10px 12px;background:rgba(15,22,41,0.5);border-radius:7px;border-left:2px solid rgba(217,119,87,0.4);font-size:11px;color:var(--muted);line-height:1.7}
+.reason-box strong{color:var(--text);font-weight:500}
+
+.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pg-cell{background:rgba(15,22,41,0.5);border-radius:7px;padding:8px 10px}
+.pg-label{font-size:10px;color:var(--muted2);margin-bottom:2px}
+.pg-val{font-size:12px;color:var(--text);font-weight:500}
+
+/* Compare panel */
+.compare-bar{position:sticky;bottom:0;background:rgba(34,33,32,0.94);border-top:0.5px solid var(--border-c);padding:10px 22px;display:none;align-items:center;justify-content:space-between;backdrop-filter:blur(8px);z-index:5}
+.compare-bar.visible{display:flex}
+.compare-chips{display:flex;gap:6px;flex-wrap:wrap}
+.compare-chip{padding:4px 10px;background:var(--indigo-dim);border:0.5px solid rgba(217,119,87,0.3);border-radius:4px;font-size:11px;color:#F0A37C;display:flex;align-items:center;gap:5px}
+.compare-chip button{background:none;border:none;color:var(--muted);cursor:pointer;padding:0;font-size:12px;line-height:1;display:flex}
+.compare-actions{display:flex;gap:7px}
+.cbtn{padding:5px 12px;border-radius:6px;font-family:var(--sans);font-size:11px;cursor:pointer;font-weight:500}
+.cbtn-clear{background:none;border:0.5px solid var(--border-c);color:var(--muted)}
+.cbtn-compare{background:var(--indigo);border:none;color:#fff}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--card2);border:0.5px solid var(--border-c);border-radius:var(--radius);padding:10px 14px;font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px;z-index:100;opacity:0;transform:translateY(8px);transition:all 0.2s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast i{color:#6FBF8B}
+
+/* Empty */
+.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);gap:8px;padding:40px}
+.empty-state i{font-size:32px;color:var(--muted2)}
+.empty-state p{font-size:13px}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── TOPBAR ── -->
+  <header class="topbar">
+    <a class="logo" href="#">
+      <div class="logo-mark">R</div>
+      <span class="logo-text">RedRob Ranker</span>
+    </a>
+    <div class="top-center" id="topCenter">
+      <i class="ti ti-file-description"></i>
+      <span id="topCenterText">No run yet — start a pipeline run from the sidebar</span>
+    </div>
+    <div class="top-right">
+      <span class="badge badge-live" id="runStatusBadge"><i class="ti ti-circle-filled" style="font-size:8px;vertical-align:1px"></i> Idle</span>
+      <span class="badge badge-warn" id="downloadBadge" style="display:none">submission.csv ready</span>
+      <div class="top-avatar" title="Account">AK</div>
+    </div>
+  </header>
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-section">Navigation</div>
+    <a class="nav-item active" href="#"><i class="ti ti-users"></i> Candidates</a>
+    <a class="nav-item" href="#"><i class="ti ti-chart-bar"></i> Analytics</a>
+    <a class="nav-item" href="#"><i class="ti ti-player-play"></i> Pipeline runs</a>
+    <a class="nav-item" href="#"><i class="ti ti-file-export"></i> Exports</a>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">Job description</div>
+
+    <div class="jd-card" id="jdCard">
+      <div class="jd-card-label">Active role</div>
+      <div class="jd-card-title" id="jdTitle">No JD parsed yet</div>
+      <div id="jdTags"></div>
+      <div class="jd-skills" id="jdSkills" style="margin-top:8px"></div>
+    </div>
+
+    <div class="sidebar-section" style="margin-top:4px">Score weights</div>
+    <div class="weight-block">
+      <div id="weightRows"></div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div style="margin-bottom:8px">
+        <input type="text" id="jdPathInput" placeholder="data/job_description.docx"
+               style="width:100%;background:var(--card2);border:0.5px solid var(--border-c);color:var(--text);font-family:var(--sans);font-size:11px;padding:6px 9px;border-radius:6px;outline:none;margin-bottom:5px">
+        <input type="text" id="candPathInput" placeholder="data/candidates.jsonl"
+               style="width:100%;background:var(--card2);border:0.5px solid var(--border-c);color:var(--text);font-family:var(--sans);font-size:11px;padding:6px 9px;border-radius:6px;outline:none">
+      </div>
+      <button class="run-btn" id="runBtn" onclick="runPipeline()">
+        <i class="ti ti-player-play"></i> Run pipeline
+      </button>
+      <div class="run-time" id="runTimeLabel">No run yet</div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+    <!-- Header -->
+    <div class="main-header">
+      <div class="mh-left">
+        <div class="mh-eyebrow">Ranked results · submission.csv</div>
+        <div class="mh-title">Top candidates</div>
+        <div class="mh-sub" id="mhSub">FAISS pool: — &nbsp;·&nbsp; Hybrid score + LightGBM re-rank</div>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-val ind" id="kAvg">—</div><div class="kpi-lbl">Avg score</div></div>
+        <div class="kpi"><div class="kpi-val" id="kTotal">10</div><div class="kpi-lbl">Showing</div></div>
+        <div class="kpi"><div class="kpi-val amb">✓</div><div class="kpi-lbl">Valid CSV</div></div>
+      </div>
+    </div>
+
+    <!-- Pipeline steps -->
+    <div class="pipeline">
+      <div class="pipeline-label">Pipeline</div>
+      <div class="pipeline-steps" id="pipelineSteps"></div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="tool-left">
+        <div class="search-wrap">
+          <i class="ti ti-search" aria-hidden="true"></i>
+          <input class="search-input" type="text" placeholder="Search name, skill, company…" id="searchBox">
+        </div>
+        <select class="sort-select" id="sortSel">
+          <option value="score">Sort: Score</option>
+          <option value="exp">Sort: Experience</option>
+          <option value="skill">Sort: Skill match</option>
+          <option value="sem">Sort: Semantic</option>
+        </select>
+        <button class="filter-btn active" data-f="all">All</button>
+        <button class="filter-btn" data-f="remote"><i class="ti ti-wifi"></i> Remote</button>
+        <button class="filter-btn" data-f="local"><i class="ti ti-map-pin"></i> Bangalore</button>
+        <button class="filter-btn" data-f="top80"><i class="ti ti-award"></i> Score &gt; 0.80</button>
+        <button class="filter-btn" data-f="phd"><i class="ti ti-school"></i> PhD</button>
+      </div>
+      <div class="tool-right"><b id="showCount">10</b> of <b>10</b> candidates</div>
+    </div>
+
+    <!-- List -->
+    <div class="cand-list" id="candList"></div>
+
+    <!-- Compare bar -->
+    <div class="compare-bar" id="compareBar">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;color:var(--muted)">Compare:</span>
+        <div class="compare-chips" id="compareChips"></div>
+      </div>
+      <div class="compare-actions">
+        <button class="cbtn cbtn-clear" onclick="clearCompare()">Clear</button>
+        <button class="cbtn cbtn-compare" onclick="showToast('Comparison view coming soon…','ti-arrows-diff')">Compare ↗</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"><i class="ti ti-circle-check"></i><span id="toastMsg"></span></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════
+   API-driven frontend for the AI Candidate Ranking System.
+   Talks to the FastAPI backend (app.py) instead of using hardcoded data.
+   Same-origin by default since the backend serves this file via
+   StaticFiles — works automatically when you run `uvicorn app:app`.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const API_BASE = '';   // same-origin; set to 'http://localhost:8000' if served separately
+
+const WEIGHT_META = {
+  semantic       : {label:'Semantic',  c:'#D97757'},
+  skill_match    : {label:'Skills',    c:'#8B5CF6'},
+  experience     : {label:'Experience',c:'#F59E0B'},
+  career_history : {label:'Career',    c:'#10B981'},
+  behaviour      : {label:'Behaviour', c:'#3B82F6'},
+  education      : {label:'Education', c:'#EC4899'},
+  location       : {label:'Location',  c:'#14B8A6'},
+};
+
+const SUBSCORE_KEY_MAP = {
+  semantic       : 'semantic_similarity',
+  skill_match    : 'skill_match',
+  experience     : 'experience_score',
+  career_history : 'career_history',
+  behaviour      : 'behaviour_score',
+  education      : 'education_score',
+  location       : 'location_score',
+};
+
+const PIPELINE_ICONS = ['ti-file-description','ti-vector','ti-database','ti-search','ti-list-search','ti-chart-bar','ti-file-export'];
+
+/* ── State ── */
+let candidates   = [];       // current ranked candidates from /api/results
+let jdProfile    = null;
+let weights      = {};
+let activeFilter = 'all';
+let activeSort   = 'score';
+let searchTerm   = '';
+let compareSet   = new Set();
+let expandedId   = null;
+let pollTimer    = null;
+
+/* ════════════════════════════════════════════════════════════════════════
+   API calls
+   ════════════════════════════════════════════════════════════════════════ */
+
+async function apiGet(path){
+  const res = await fetch(API_BASE + path);
+  if(!res.ok){
+    const body = await res.json().catch(()=>({detail:res.statusText}));
+    throw new Error(body.detail || `${res.status} ${res.statusText}`);
+  }
+  return res.json();
+}
+
+async function apiPost(path, body){
+  const res = await fetch(API_BASE + path, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body || {}),
+  });
+  if(!res.ok){
+    const errBody = await res.json().catch(()=>({detail:res.statusText}));
+    throw new Error(errBody.detail || `${res.status} ${res.statusText}`);
+  }
+  return res.json();
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Run pipeline
+   ════════════════════════════════════════════════════════════════════════ */
+
+async function runPipeline(){
+  const btn = document.getElementById('runBtn');
+  const jdPath   = document.getElementById('jdPathInput').value.trim();
+  const candPath = document.getElementById('candPathInput').value.trim();
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i> Starting…';
+
+  try{
+    await apiPost('/api/run', {
+      jd_path: jdPath || null,
+      candidates_path: candPath || null,
+      faiss_k: 2000,
+      top_n: 100,
+      force_reembed: false,
+      use_lgbm: true,
+    });
+    showToast('Pipeline started — tracking progress…','ti-player-play');
+    document.getElementById('runStatusBadge').className = 'badge badge-warn';
+    document.getElementById('runStatusBadge').innerHTML = '<i class="ti ti-loader" style="font-size:10px;animation:spin 1s linear infinite"></i> Running';
+    startPolling();
+  }catch(err){
+    showToast(err.message || 'Failed to start pipeline','ti-alert-circle');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-player-play"></i> Run pipeline';
+  }
+}
+
+function startPolling(){
+  if(pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(pollStatus, 1500);
+  pollStatus();
+}
+
+async function pollStatus(){
+  let status;
+  try{
+    status = await apiGet('/api/status');
+  }catch(err){
+    console.error('Status poll failed:', err);
+    return;
+  }
+
+  renderPipelineSteps(status.steps || []);
+  updateRunTimeLabel(status);
+
+  if(status.status === 'completed'){
+    clearInterval(pollTimer);
+    pollTimer = null;
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('runBtn').innerHTML = '<i class="ti ti-player-play"></i> Run pipeline';
+    document.getElementById('runStatusBadge').className = 'badge badge-live';
+    document.getElementById('runStatusBadge').innerHTML = '<i class="ti ti-circle-filled" style="font-size:8px;vertical-align:1px"></i> Run complete';
+    document.getElementById('downloadBadge').style.display = 'inline-block';
+    showToast(`Run complete — ${status.result_count} candidates ranked`,'ti-circle-check');
+    await loadResults();
+  } else if(status.status === 'failed'){
+    clearInterval(pollTimer);
+    pollTimer = null;
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('runBtn').innerHTML = '<i class="ti ti-player-play"></i> Run pipeline';
+    document.getElementById('runStatusBadge').className = 'badge';
+    document.getElementById('runStatusBadge').style.cssText = 'background:rgba(239,68,68,0.15);color:#E2685B;border:0.5px solid rgba(239,68,68,0.3)';
+    document.getElementById('runStatusBadge').innerHTML = '<i class="ti ti-x" style="font-size:10px"></i> Failed';
+    showToast(status.error || 'Pipeline run failed','ti-alert-circle');
+  }
+}
+
+function updateRunTimeLabel(status){
+  const el = document.getElementById('runTimeLabel');
+  if(status.elapsed_seconds == null){ el.textContent = 'No run yet'; return; }
+  const mins = Math.floor(status.elapsed_seconds/60);
+  const secs = Math.round(status.elapsed_seconds%60);
+  const timeStr = mins>0 ? `${mins}m ${secs}s` : `${secs}s`;
+  el.textContent = status.status==='running' || status.status==='queued'
+    ? `Running… ${timeStr} elapsed`
+    : `Last run: ${timeStr}${status.result_count ? ' · '+status.result_count+' candidates' : ''}`;
+}
+
+function renderPipelineSteps(steps){
+  const ps = document.getElementById('pipelineSteps');
+  ps.innerHTML = '';
+  steps.forEach((s,i)=>{
+    if(i>0) ps.insertAdjacentHTML('beforeend','<div class="ps-conn"></div>');
+    const icon = s.status==='done' ? 'ti-circle-check'
+               : s.status==='active' ? 'ti-loader'
+               : s.status==='failed' ? 'ti-x'
+               : 'ti-circle';
+    const spin = s.status==='active' ? 'style="animation:spin 1s linear infinite"' : '';
+    ps.insertAdjacentHTML('beforeend',
+      `<div class="ps ${s.status}" title="${s.detail||''}">
+         <i class="ti ${icon} status" ${spin}></i>
+         <span class="ps-name">${s.name}</span>
+       </div>`);
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Load results (JD + ranked candidates) from the API
+   ════════════════════════════════════════════════════════════════════════ */
+
+async function loadResults(){
+  try{
+    const data = await apiGet('/api/results');
+    jdProfile  = data.jd_profile;
+    weights    = data.weights;
+    candidates = data.candidates.map(normalizeCandidate);
+
+    renderJdCard();
+    renderWeights();
+    document.getElementById('kAvg').textContent = data.avg_score.toFixed(3);
+    document.getElementById('mhSub').textContent =
+      `${candidates.length} ranked · Hybrid score + LightGBM re-rank`;
+    document.getElementById('topCenterText').textContent =
+      `${jdProfile.role_title} · ${(jdProfile.locations||[]).join(', ') || 'Any location'} · ` +
+      (jdProfile.experience ? `${jdProfile.experience.min_years}–${jdProfile.experience.max_years} yrs` : '');
+    render();
+  }catch(err){
+    if(err.message && err.message.includes('No completed run')){
+      // Expected on first load before any run — show empty state quietly.
+      document.getElementById('candList').innerHTML =
+        `<div class="empty-state"><i class="ti ti-player-play"></i><p>No results yet. Set file paths in the sidebar and click "Run pipeline".</p></div>`;
+    } else {
+      showToast(err.message || 'Failed to load results','ti-alert-circle');
+    }
+  }
+}
+
+function normalizeCandidate(c){
+  return {
+    id       : c.candidate_id,
+    rank     : c.rank,
+    name     : c.name || c.candidate_id,
+    role     : c.role || 'Unknown role',
+    company  : c.company || '',
+    loc      : c.location || 'Unknown',
+    remote   : !!c.remote,
+    exp      : c.total_experience_years || 0,
+    skills   : (c.skills || []).slice(0,4),
+    softSkills: (c.skills || []).slice(4,6),
+    score    : c.score,
+    scores   : c.sub_scores,
+    reason   : c.reasoning,
+    phd      : (c.sub_scores.education_score || 0) >= 1.0,
+  };
+}
+
+function renderJdCard(){
+  document.getElementById('jdTitle').textContent = jdProfile.role_title || 'Unknown role';
+
+  const tags = document.getElementById('jdTags');
+  tags.innerHTML = '';
+  if(jdProfile.experience){
+    tags.insertAdjacentHTML('beforeend',
+      `<span class="jd-tag jd-tag-ind"><i class="ti ti-clock" style="font-size:10px"></i> ${jdProfile.experience.min_years}–${jdProfile.experience.max_years} yrs</span>`);
+  }
+  if(jdProfile.seniority){
+    tags.insertAdjacentHTML('beforeend',
+      `<span class="jd-tag jd-tag-amb">${capitalize(jdProfile.seniority)}</span>`);
+  }
+  (jdProfile.locations||[]).slice(0,2).forEach(loc=>{
+    tags.insertAdjacentHTML('beforeend',
+      `<span class="jd-tag jd-tag-grn"><i class="ti ti-map-pin" style="font-size:10px"></i> ${loc}</span>`);
+  });
+
+  const skillsEl = document.getElementById('jdSkills');
+  skillsEl.innerHTML = '';
+  (jdProfile.mandatory_skills||[]).forEach(s=>{
+    skillsEl.insertAdjacentHTML('beforeend', `<span class="skill-pill required">${s}</span>`);
+  });
+  (jdProfile.preferred_skills||[]).slice(0,4).forEach(s=>{
+    skillsEl.insertAdjacentHTML('beforeend', `<span class="skill-pill">${s}</span>`);
+  });
+}
+
+function renderWeights(){
+  const wr = document.getElementById('weightRows');
+  wr.innerHTML = '';
+  Object.entries(weights).forEach(([key,val])=>{
+    const meta = WEIGHT_META[key] || {label:capitalize(key), c:'var(--muted)'};
+    wr.insertAdjacentHTML('beforeend',
+      `<div class="weight-row2">
+        <span class="wr-name">${meta.label}</span>
+        <div class="wr-track"><div class="wr-fill" style="width:${val*100}%;background:${meta.c}"></div></div>
+        <span class="wr-pct">${(val*100).toFixed(0)}%</span>
+      </div>`);
+  });
+}
+
+function capitalize(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   Score ring rendering
+   ════════════════════════════════════════════════════════════════════════ */
+
+function drawRing(canvas,score,color){
+  const dpr=window.devicePixelRatio||1,s=44;
+  canvas.width=s*dpr;canvas.height=s*dpr;
+  canvas.style.width=s+'px';canvas.style.height=s+'px';
+  const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
+  const cx=s/2,cy=s/2,r=18,lw=4;
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+  ctx.strokeStyle='rgba(217,119,87,0.10)';ctx.lineWidth=lw;ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+Math.PI*2*score);
+  ctx.strokeStyle=color;ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();
+  ctx.fillStyle='#F4F2EC';ctx.font=`500 9px Inter,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(score.toFixed(2),cx,cy);
+}
+function ringColor(s){return s>=0.88?'#D9A356':s>=0.82?'#D97757':'#7AA6C2'}
+function rankMedal(r){return r===1?'🥇':r===2?'🥈':r===3?'🥉':'';}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Candidate card rendering
+   ════════════════════════════════════════════════════════════════════════ */
+
+function buildCard(c,rank){
+  const div=document.createElement('div');
+  div.className='cand-card'+(rank<=3?' rank'+rank:'');
+  div.dataset.cid=c.id;
+
+  let bdg = '';
+  if(rank===1) bdg += `<span class="cand-badge cb-hot">Top match</span>`;
+  if(c.phd)    bdg += `<span class="cand-badge cb-phd">PhD</span>`;
+
+  div.innerHTML=`
+  <div class="card-top">
+    <div class="rank-col">
+      <div class="rank-medal">${rank<=3?rankMedal(rank):'<span style="font-size:12px;color:var(--muted)">'+rank+'</span>'}</div>
+      <div class="ring-wrap"><canvas></canvas></div>
+    </div>
+    <div class="card-body">
+      <div class="cand-name-line">
+        <span class="cand-name">${escapeHtml(c.name)}</span>${bdg}
+      </div>
+      <div class="cand-role">${escapeHtml(c.role)}${c.company?' · '+escapeHtml(c.company):''} &nbsp;·&nbsp; ${c.exp.toFixed(1)} yrs exp</div>
+      <div class="skill-row">
+        ${c.skills.map(s=>`<span class="sc sc-match">${escapeHtml(s)}</span>`).join('')}
+        ${c.softSkills.map(s=>`<span class="sc sc-soft">${escapeHtml(s)}</span>`).join('')}
+      </div>
+    </div>
+    <div class="card-right">
+      <div class="final-score">${c.score.toFixed(4)}<span class="score-sub"> /1.00</span></div>
+      <div class="meta-row">
+        <i class="ti ti-map-pin" style="font-size:11px" aria-hidden="true"></i>
+        ${escapeHtml(c.loc)}${c.remote?' · Remote':''}
+      </div>
+      <div class="meta-row" style="margin-top:2px">
+        <input type="checkbox" id="cmp-${c.id}" style="width:12px;height:12px;accent-color:var(--indigo);cursor:pointer" title="Add to compare" ${compareSet.has(c.id)?'checked':''} onclick="event.stopPropagation();toggleCompare('${c.id}',this)">
+        <label for="cmp-${c.id}" style="font-size:10px;color:var(--muted);cursor:pointer" onclick="event.stopPropagation()">Compare</label>
+      </div>
+    </div>
+  </div>
+  <div class="card-detail" style="display:${expandedId===c.id?'block':'none'}">
+    <div class="detail-tabs">
+      <span class="dtab active" data-tab="scores">Sub-scores</span>
+      <span class="dtab" data-tab="reason">Reasoning</span>
+      <span class="dtab" data-tab="profile">Profile</span>
+    </div>
+    <div class="tab-panel active" data-panel="scores">
+      <div class="score-grid">
+        ${Object.entries(WEIGHT_META).map(([key,meta])=>{
+          const sk = SUBSCORE_KEY_MAP[key];
+          const val = c.scores[sk] || 0;
+          return `<div class="sg-cell">
+            <div class="sg-label">${meta.label}</div>
+            <div class="sg-val">${val.toFixed(3)}</div>
+            <div class="sg-bar"><div class="sg-fill" style="width:${(val*100).toFixed(1)}%;background:${meta.c}"></div></div>
+          </div>`;
+        }).join('')}
+        <div class="sg-cell highlight">
+          <div class="sg-label gold">Final</div>
+          <div class="sg-val gold">${c.score.toFixed(4)}</div>
+          <div class="sg-bar" style="background:rgba(245,158,11,0.15)"><div class="sg-fill gold" style="width:${(c.score*100).toFixed(1)}%"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="tab-panel" data-panel="reason">
+      <div class="reason-box">${escapeHtml(c.reason)}</div>
+    </div>
+    <div class="tab-panel" data-panel="profile">
+      <div class="profile-grid">
+        <div class="pg-cell"><div class="pg-label">Company</div><div class="pg-val">${escapeHtml(c.company)||'—'}</div></div>
+        <div class="pg-cell"><div class="pg-label">Experience</div><div class="pg-val">${c.exp.toFixed(1)} yrs</div></div>
+        <div class="pg-cell"><div class="pg-label">Quality score</div><div class="pg-val">${(c.scores.quality_score||0).toFixed(2)}</div></div>
+        <div class="pg-cell"><div class="pg-label">Location</div><div class="pg-val">${escapeHtml(c.loc)}</div></div>
+        <div class="pg-cell"><div class="pg-label">Candidate ID</div><div class="pg-val" style="font-size:11px;color:var(--muted)">${escapeHtml(c.id)}</div></div>
+        <div class="pg-cell"><div class="pg-label">Remote</div><div class="pg-val">${c.remote?'Yes':'No'}</div></div>
+      </div>
+    </div>
+  </div>`;
+
+  const canvas=div.querySelector('canvas');
+  requestAnimationFrame(()=>drawRing(canvas,c.score,ringColor(c.score)));
+
+  div.addEventListener('click',e=>{
+    if(e.target.closest('input,label,.dtab'))return;
+    const detail=div.querySelector('.card-detail');
+    const open=detail.style.display==='block';
+    if(open){detail.style.display='none';div.classList.remove('expanded');expandedId=null;}
+    else{detail.style.display='block';div.classList.add('expanded');expandedId=c.id;}
+  });
+
+  div.querySelectorAll('.dtab').forEach(tab=>{
+    tab.addEventListener('click',e=>{
+      e.stopPropagation();
+      div.querySelectorAll('.dtab').forEach(t=>t.classList.remove('active'));
+      div.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      tab.classList.add('active');
+      div.querySelector(`.tab-panel[data-panel="${tab.dataset.tab}"]`).classList.add('active');
+    });
+  });
+
+  return div;
+}
+
+function escapeHtml(s){
+  const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Filter / sort / render
+   ════════════════════════════════════════════════════════════════════════ */
+
+function getSorted(list){
+  return [...list].sort((a,b)=>{
+    if(activeSort==='score')return b.score-a.score;
+    if(activeSort==='exp')return b.exp-a.exp;
+    if(activeSort==='skill')return (b.scores.skill_match||0)-(a.scores.skill_match||0);
+    if(activeSort==='sem')return (b.scores.semantic_similarity||0)-(a.scores.semantic_similarity||0);
+    return 0;
+  });
+}
+
+function render(){
+  const list=document.getElementById('candList');
+  list.innerHTML='';
+  if(candidates.length===0){
+    list.innerHTML=`<div class="empty-state"><i class="ti ti-player-play"></i><p>No results yet. Set file paths in the sidebar and click "Run pipeline".</p></div>`;
+    document.getElementById('showCount').textContent=0;
+    document.getElementById('kTotal').textContent=0;
+    return;
+  }
+  const q=searchTerm.toLowerCase();
+  let shown=0;
+  const sorted=getSorted(candidates);
+  sorted.forEach((c)=>{
+    const nameMatch=!q||c.name.toLowerCase().includes(q)||c.role.toLowerCase().includes(q)||c.id.toLowerCase().includes(q)||c.skills.some(s=>s.toLowerCase().includes(q))||c.softSkills.some(s=>s.toLowerCase().includes(q));
+    if(!nameMatch)return;
+    if(activeFilter==='remote'&&!c.remote)return;
+    if(activeFilter==='local'&&!c.loc.toLowerCase().includes('bangalore'))return;
+    if(activeFilter==='top80'&&c.score<=0.80)return;
+    if(activeFilter==='phd'&&!c.phd)return;
+    shown++;
+    list.appendChild(buildCard(c,c.rank));
+  });
+  document.getElementById('showCount').textContent=shown;
+  document.getElementById('kTotal').textContent=shown;
+  if(shown===0){
+    list.innerHTML=`<div class="empty-state"><i class="ti ti-mood-empty"></i><p>No candidates match this filter.</p></div>`;
+  }
+}
+
+document.getElementById('searchBox').addEventListener('input',e=>{searchTerm=e.target.value;render();});
+document.getElementById('sortSel').addEventListener('change',e=>{activeSort=e.target.value;render();});
+document.querySelectorAll('[data-f]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    activeFilter=btn.dataset.f;
+    document.querySelectorAll('[data-f]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    render();
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════════════
+   Compare
+   ════════════════════════════════════════════════════════════════════════ */
+
+function toggleCompare(id,checkbox){
+  if(compareSet.has(id)){compareSet.delete(id);}
+  else{
+    if(compareSet.size>=4){checkbox.checked=false;showToast('Max 4 candidates for comparison','ti-alert-circle');return;}
+    compareSet.add(id);
+  }
+  renderCompareBar();
+}
+function renderCompareBar(){
+  const bar=document.getElementById('compareBar');
+  const chips=document.getElementById('compareChips');
+  chips.innerHTML='';
+  compareSet.forEach(id=>{
+    const c=candidates.find(x=>x.id===id);
+    if(!c)return;
+    const chip=document.createElement('div');chip.className='compare-chip';
+    chip.innerHTML=`${escapeHtml(c.name)}<button onclick="removeCompare('${id}')" aria-label="Remove ${escapeHtml(c.name)}"><i class="ti ti-x" style="font-size:11px"></i></button>`;
+    chips.appendChild(chip);
+  });
+  bar.classList.toggle('visible',compareSet.size>0);
+}
+function removeCompare(id){
+  compareSet.delete(id);
+  const cb=document.getElementById('cmp-'+id);
+  if(cb)cb.checked=false;
+  renderCompareBar();
+}
+function clearCompare(){
+  compareSet.clear();
+  document.querySelectorAll('[id^=cmp-]').forEach(cb=>cb.checked=false);
+  renderCompareBar();
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Toast + download
+   ════════════════════════════════════════════════════════════════════════ */
+
+let toastTimer;
+function showToast(msg,icon='ti-circle-check'){
+  const t=document.getElementById('toast');
+  t.querySelector('i').className=`ti ${icon}`;
+  document.getElementById('toastMsg').textContent=msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+function downloadCSV(){
+  window.location.href = API_BASE + '/api/download';
+  showToast('Downloading submission.csv…','ti-download');
+}
+
+/* Expose for inline onclick handlers */
+window.runPipeline=runPipeline;
+window.clearCompare=clearCompare;
+window.removeCompare=removeCompare;
+window.toggleCompare=toggleCompare;
+window.showToast=showToast;
+window.downloadCSV=downloadCSV;
+
+document.getElementById('downloadBadge').style.cursor='pointer';
+document.getElementById('downloadBadge').addEventListener('click',downloadCSV);
+document.getElementById('downloadBadge').title='Click to download submission.csv';
+
+/* Spinner keyframes (added via JS to keep the <style> block short during streaming) */
+const spinStyle=document.createElement('style');
+spinStyle.textContent='@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}';
+document.head.appendChild(spinStyle);
+
+/* ════════════════════════════════════════════════════════════════════════
+   Bootstrap — check health, load any existing results, resume polling
+   if a run happens to already be in progress (e.g. page refresh mid-run)
+   ════════════════════════════════════════════════════════════════════════ */
+
+(async function init(){
+  render();   // show empty state immediately
+
+  try{
+    const health = await apiGet('/api/health');
+    if(!health.pipeline_modules_loaded){
+      showToast('Backend pipeline modules failed to import — check server logs','ti-alert-circle');
+    }
+  }catch(err){
+    showToast('Cannot reach backend API — is uvicorn running?','ti-plug-connected-x');
+    return;
+  }
+
+  try{
+    const status = await apiGet('/api/status');
+    renderPipelineSteps(status.steps || []);
+    updateRunTimeLabel(status);
+    if(status.status==='running' || status.status==='queued'){
+      document.getElementById('runBtn').disabled = true;
+      document.getElementById('runBtn').innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i> Running…';
+      document.getElementById('runStatusBadge').className = 'badge badge-warn';
+      document.getElementById('runStatusBadge').innerHTML = '<i class="ti ti-loader" style="font-size:10px;animation:spin 1s linear infinite"></i> Running';
+      startPolling();
+    } else if(status.status==='completed'){
+      document.getElementById('downloadBadge').style.display = 'inline-block';
+      await loadResults();
+    }
+  }catch(err){
+    console.error('Initial status check failed:', err);
+  }
+})();
+</script>
+</body>
+</html>
