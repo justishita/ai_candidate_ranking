@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RedRob — AI Candidate Ranking</title>
+<title>AI Candidate Ranking</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
@@ -45,7 +45,7 @@ html,body{height:100%;background:var(--navy);color:var(--text);font-family:var(-
 
 /* ══════════════════ SIDEBAR ══════════════════ */
 .sidebar-section{padding:16px 14px 8px;font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:0.09em}
-.nav-item{display:flex;align-items:center;gap:9px;padding:8px 14px;font-size:13px;color:var(--muted);cursor:pointer;border-radius:0;transition:background 0.12s;text-decoration:none;border-left:2px solid transparent}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 14px;font-size:13px;color:var(--muted);cursor:pointer;border-radius:0;transition:background 0.12s;text-decoration:none;border-left:2px solid transparent;background:none;border:none;border-left:2px solid transparent;width:100%;text-align:left;font-family:var(--sans)}
 .nav-item i{font-size:16px;width:18px;flex-shrink:0}
 .nav-item:hover{background:rgba(217,119,87,0.07);color:var(--text)}
 .nav-item.active{background:var(--indigo-dim);color:#F2B294;border-left-color:var(--indigo)}
@@ -73,6 +73,7 @@ html,body{height:100%;background:var(--navy);color:var(--text);font-family:var(-
 .sidebar-footer{margin-top:auto;padding:12px 14px;border-top:0.5px solid var(--border-c)}
 .run-btn{width:100%;background:var(--indigo);color:#fff;border:none;border-radius:var(--radius);padding:9px;font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.15s}
 .run-btn:hover{background:#E8916C}
+.run-btn:disabled{opacity:0.75;cursor:not-allowed}
 .run-time{text-align:center;font-size:10px;color:var(--muted2);margin-top:6px}
 
 /* ══════════════════ MAIN CONTENT ══════════════════ */
@@ -120,6 +121,12 @@ html,body{height:100%;background:var(--navy);color:var(--text);font-family:var(-
 
 /* Candidate list */
 .cand-list{flex:1;padding:10px 22px 22px;display:flex;flex-direction:column;gap:8px}
+
+/* Running overlay */
+.run-loading{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:60px;color:var(--muted)}
+.run-spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(217,119,87,0.18);border-top-color:var(--indigo);animation:spin 0.8s linear infinite}
+.run-loading p{font-size:13px}
+.run-loading .rl-step{font-size:11px;color:var(--muted2)}
 
 /* Candidate card */
 .cand-card{background:var(--card);border:0.5px solid var(--border-c);border-radius:var(--radius-lg);padding:14px 16px;cursor:pointer;transition:border-color 0.15s,background 0.15s;position:relative}
@@ -228,9 +235,7 @@ html,body{height:100%;background:var(--navy);color:var(--text);font-family:var(-
   <aside class="sidebar">
     <div class="sidebar-section">Navigation</div>
     <a class="nav-item active" href="#"><i class="ti ti-users"></i> Candidates</a>
-    <a class="nav-item" href="#"><i class="ti ti-chart-bar"></i> Analytics</a>
-    <a class="nav-item" href="#"><i class="ti ti-player-play"></i> Pipeline runs</a>
-    <a class="nav-item" href="#"><i class="ti ti-file-export"></i> Exports</a>
+    <button class="nav-item" id="exportNavBtn"><i class="ti ti-file-export"></i> Export</button>
     <div class="sidebar-divider"></div>
     <div class="sidebar-section">Job description</div>
 
@@ -247,12 +252,6 @@ html,body{height:100%;background:var(--navy);color:var(--text);font-family:var(-
     </div>
 
     <div class="sidebar-footer">
-      <div style="margin-bottom:8px">
-        <input type="text" id="jdPathInput" placeholder="data/job_description.docx"
-               style="width:100%;background:var(--card2);border:0.5px solid var(--border-c);color:var(--text);font-family:var(--sans);font-size:11px;padding:6px 9px;border-radius:6px;outline:none;margin-bottom:5px">
-        <input type="text" id="candPathInput" placeholder="data/candidates.jsonl"
-               style="width:100%;background:var(--card2);border:0.5px solid var(--border-c);color:var(--text);font-family:var(--sans);font-size:11px;padding:6px 9px;border-radius:6px;outline:none">
-      </div>
       <button class="run-btn" id="runBtn" onclick="runPipeline()">
         <i class="ti ti-player-play"></i> Run pipeline
       </button>
@@ -267,7 +266,6 @@ html,body{height:100%;background:var(--navy);color:var(--text);font-family:var(-
       <div class="mh-left">
         <div class="mh-eyebrow">Ranked results · submission.csv</div>
         <div class="mh-title">Top candidates</div>
-        <div class="mh-sub" id="mhSub">FAISS pool: — &nbsp;·&nbsp; Hybrid score + LightGBM re-rank</div>
       </div>
       <div class="kpi-row">
         <div class="kpi"><div class="kpi-val ind" id="kAvg">—</div><div class="kpi-lbl">Avg score</div></div>
@@ -297,7 +295,7 @@ html,body{height:100%;background:var(--navy);color:var(--text);font-family:var(-
         </select>
         <button class="filter-btn active" data-f="all">All</button>
         <button class="filter-btn" data-f="remote"><i class="ti ti-wifi"></i> Remote</button>
-        <button class="filter-btn" data-f="local"><i class="ti ti-map-pin"></i> Bangalore</button>
+        <button class="filter-btn" data-f="local" id="localFilterBtn"><i class="ti ti-map-pin"></i> <span id="localFilterLabel">Local</span></button>
         <button class="filter-btn" data-f="top80"><i class="ti ti-award"></i> Score &gt; 0.80</button>
         <button class="filter-btn" data-f="phd"><i class="ti ti-school"></i> PhD</button>
       </div>
@@ -366,6 +364,8 @@ let searchTerm   = '';
 let compareSet   = new Set();
 let expandedId   = null;
 let pollTimer    = null;
+let baseLocation = '';       // dynamically derived "local" location for the location filter
+let isRunning    = false;
 
 /* ════════════════════════════════════════════════════════════════════════
    API calls
@@ -399,16 +399,16 @@ async function apiPost(path, body){
 
 async function runPipeline(){
   const btn = document.getElementById('runBtn');
-  const jdPath   = document.getElementById('jdPathInput').value.trim();
-  const candPath = document.getElementById('candPathInput').value.trim();
 
   btn.disabled = true;
   btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i> Starting…';
+  isRunning = true;
+  renderRunningState();
 
   try{
     await apiPost('/api/run', {
-      jd_path: jdPath || null,
-      candidates_path: candPath || null,
+      jd_path: null,
+      candidates_path: null,
       faiss_k: 2000,
       top_n: 100,
       force_reembed: false,
@@ -420,9 +420,22 @@ async function runPipeline(){
     startPolling();
   }catch(err){
     showToast(err.message || 'Failed to start pipeline','ti-alert-circle');
+    isRunning = false;
     btn.disabled = false;
     btn.innerHTML = '<i class="ti ti-player-play"></i> Run pipeline';
+    render();
   }
+}
+
+function renderRunningState(){
+  const list=document.getElementById('candList');
+  const activeStep = (window.__lastSteps||[]).find(s=>s.status==='active');
+  list.innerHTML = `
+    <div class="run-loading">
+      <div class="run-spinner"></div>
+      <p>Running the ranking pipeline…</p>
+      <div class="rl-step">${activeStep ? escapeHtml(activeStep.name) : 'Warming up…'}</div>
+    </div>`;
 }
 
 function startPolling(){
@@ -440,12 +453,15 @@ async function pollStatus(){
     return;
   }
 
+  window.__lastSteps = status.steps || [];
   renderPipelineSteps(status.steps || []);
   updateRunTimeLabel(status);
+  if(isRunning) renderRunningState();
 
   if(status.status === 'completed'){
     clearInterval(pollTimer);
     pollTimer = null;
+    isRunning = false;
     document.getElementById('runBtn').disabled = false;
     document.getElementById('runBtn').innerHTML = '<i class="ti ti-player-play"></i> Run pipeline';
     document.getElementById('runStatusBadge').className = 'badge badge-live';
@@ -456,12 +472,14 @@ async function pollStatus(){
   } else if(status.status === 'failed'){
     clearInterval(pollTimer);
     pollTimer = null;
+    isRunning = false;
     document.getElementById('runBtn').disabled = false;
     document.getElementById('runBtn').innerHTML = '<i class="ti ti-player-play"></i> Run pipeline';
     document.getElementById('runStatusBadge').className = 'badge';
     document.getElementById('runStatusBadge').style.cssText = 'background:rgba(239,68,68,0.15);color:#E2685B;border:0.5px solid rgba(239,68,68,0.3)';
     document.getElementById('runStatusBadge').innerHTML = '<i class="ti ti-x" style="font-size:10px"></i> Failed';
     showToast(status.error || 'Pipeline run failed','ti-alert-circle');
+    render();
   }
 }
 
@@ -507,9 +525,8 @@ async function loadResults(){
 
     renderJdCard();
     renderWeights();
+    deriveBaseLocation();
     document.getElementById('kAvg').textContent = data.avg_score.toFixed(3);
-    document.getElementById('mhSub').textContent =
-      `${candidates.length} ranked · Hybrid score + LightGBM re-rank`;
     document.getElementById('topCenterText').textContent =
       `${jdProfile.role_title} · ${(jdProfile.locations||[]).join(', ') || 'Any location'} · ` +
       (jdProfile.experience ? `${jdProfile.experience.min_years}–${jdProfile.experience.max_years} yrs` : '');
@@ -522,6 +539,33 @@ async function loadResults(){
     } else {
       showToast(err.message || 'Failed to load results','ti-alert-circle');
     }
+  }
+}
+
+/* Work out the "home base" location to power the dynamic local-candidates
+   filter, instead of a hardcoded city. Prefers the JD's own location(s);
+   falls back to whichever location shows up most often among candidates. */
+function deriveBaseLocation(){
+  if(jdProfile && jdProfile.locations && jdProfile.locations.length){
+    baseLocation = jdProfile.locations[0];
+  } else if(candidates.length){
+    const counts = {};
+    candidates.forEach(c=>{
+      if(!c.loc) return;
+      counts[c.loc] = (counts[c.loc]||0) + 1;
+    });
+    baseLocation = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0] || '';
+  } else {
+    baseLocation = '';
+  }
+
+  const btn = document.getElementById('localFilterBtn');
+  const label = document.getElementById('localFilterLabel');
+  if(baseLocation){
+    label.textContent = baseLocation;
+    btn.style.display = '';
+  } else {
+    btn.style.display = 'none';
   }
 }
 
@@ -731,6 +775,7 @@ function getSorted(list){
 }
 
 function render(){
+  if(isRunning){ renderRunningState(); return; }
   const list=document.getElementById('candList');
   list.innerHTML='';
   if(candidates.length===0){
@@ -746,7 +791,7 @@ function render(){
     const nameMatch=!q||c.name.toLowerCase().includes(q)||c.role.toLowerCase().includes(q)||c.company.toLowerCase().includes(q)||c.loc.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)||c.skills.some(s=>s.toLowerCase().includes(q))||c.softSkills.some(s=>s.toLowerCase().includes(q));
     if(!nameMatch)return;
     if(activeFilter==='remote'&&!c.remote)return;
-    if(activeFilter==='local'&&!c.loc.toLowerCase().includes('bangalore'))return;
+    if(activeFilter==='local'&&!(baseLocation && c.loc.toLowerCase().includes(baseLocation.toLowerCase())))return;
     if(activeFilter==='top80'&&c.score<=0.80)return;
     if(activeFilter==='phd'&&!c.phd)return;
     shown++;
@@ -822,7 +867,12 @@ function showToast(msg,icon='ti-circle-check'){
 }
 
 function downloadCSV(){
-  window.location.href = API_BASE + '/api/download';
+  const a = document.createElement('a');
+  a.href = API_BASE + '/api/download';
+  a.download = 'submission.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
   showToast('Downloading submission.csv…','ti-download');
 }
 
@@ -837,6 +887,7 @@ window.downloadCSV=downloadCSV;
 document.getElementById('downloadBadge').style.cursor='pointer';
 document.getElementById('downloadBadge').addEventListener('click',downloadCSV);
 document.getElementById('downloadBadge').title='Click to download submission.csv';
+document.getElementById('exportNavBtn').addEventListener('click',downloadCSV);
 
 /* Spinner keyframes (added via JS to keep the <style> block short during streaming) */
 const spinStyle=document.createElement('style');
@@ -849,6 +900,7 @@ document.head.appendChild(spinStyle);
    ════════════════════════════════════════════════════════════════════════ */
 
 (async function init(){
+  document.getElementById('localFilterBtn').style.display='none'; // hidden until we know a location
   render();   // show empty state immediately
 
   try{
@@ -863,13 +915,16 @@ document.head.appendChild(spinStyle);
 
   try{
     const status = await apiGet('/api/status');
+    window.__lastSteps = status.steps || [];
     renderPipelineSteps(status.steps || []);
     updateRunTimeLabel(status);
     if(status.status==='running' || status.status==='queued'){
+      isRunning = true;
       document.getElementById('runBtn').disabled = true;
       document.getElementById('runBtn').innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite"></i> Running…';
       document.getElementById('runStatusBadge').className = 'badge badge-warn';
       document.getElementById('runStatusBadge').innerHTML = '<i class="ti ti-loader" style="font-size:10px;animation:spin 1s linear infinite"></i> Running';
+      renderRunningState();
       startPolling();
     } else if(status.status==='completed'){
       document.getElementById('downloadBadge').style.display = 'inline-block';
