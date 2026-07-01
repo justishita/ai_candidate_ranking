@@ -178,7 +178,9 @@ def score_career_history(
 
     experiences: list[dict[str, Any]] = []
     if raw_candidate is not None:
-        experiences = list(raw_candidate.get("work_experience", []) or [])
+        experiences = list(
+            raw_candidate.get("career_history") or raw_candidate.get("work_experience") or []
+        )
 
     if len(experiences) >= 2:
         # Sort by start date (best-effort string sort works for ISO dates)

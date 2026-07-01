@@ -165,7 +165,7 @@ def rank_candidates(
             }
 
         try:
-            h_score = hybrid_score(sub_scores, w)
+            h_score = round(hybrid_score(sub_scores, w), 4)
         except Exception as exc:
             logger.warning("hybrid_score failed for %s: %s", cid, exc)
             h_score = 0.0
@@ -177,11 +177,15 @@ def rank_candidates(
             "total_experience_years"    : float(features.get("total_experience_years", 0.0)),
             "relevant_experience_years" : float(features.get("relevant_experience_years", 0.0)),
             "skill_match_score"         : float(features.get("skill_match_score", 0.0)),
+            "skills_list"               : features.get("skills_list", []),
             **sub_scores,
         }
         rows.append(row)
 
-    # ── Stage 1: sort by hybrid score ────────────────────────────────────────
+    # ── Stage 1: sort by hybrid score, tie-broken by candidate_id ascending ───
+    # (submission_spec.md §3: "If two candidates have the same score, you must
+    # still assign unique ranks... by candidate_id ascending.")
+    rows.sort(key=lambda r: r["candidate_id"])
     rows.sort(key=lambda r: r["hybrid_score"], reverse=True)
 
     # ── Stage 2: optional LightGBM re-ranking ────────────────────────────────
@@ -206,6 +210,15 @@ def rank_candidates(
             "location_score"     : row["location_score"],
             "quality_score"      : row["quality_score"],
             "hybrid_score"       : row["hybrid_score"],
+            # Carried through for reason_generator — the raw JSONL candidate
+            # has none of these as flat fields (years_of_experience lives at
+            # profile.years_of_experience, skills is a list of dicts, etc.),
+            # so reasoning generation needs the already-computed feature
+            # values, not the raw record.
+            "total_experience_years"    : row.get("total_experience_years", 0.0),
+            "relevant_experience_years" : row.get("relevant_experience_years", 0.0),
+            "skill_match_score"         : row.get("skill_match_score", 0.0),
+            "skills_list"               : row.get("skills_list", []),
         })
 
     return ranked
@@ -234,6 +247,7 @@ def _lgbm_rerank(
         for row, score in zip(rows, lgbm_scores):
             row["lgbm_score"] = float(score)
 
+        rows.sort(key=lambda r: r["candidate_id"])
         rows.sort(key=lambda r: r["lgbm_score"], reverse=True)
         logger.info("LightGBM re-ranking applied to %d candidates.", len(rows))
     except Exception as exc:

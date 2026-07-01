@@ -258,7 +258,13 @@ def generate_reasons_bulk(
     reasons: list[str] = []
     for r in ranked_candidates:
         cid      = str(r.get("candidate_id", ""))
-        cand_src = (raw_lookup or {}).get(cid, r)   # prefer raw for skills
+        # `r` carries the already-computed experience/skills fields (see
+        # ranker.rank_candidates); the raw JSONL record does NOT have these
+        # as flat fields (years_of_experience lives at profile.*, skills is
+        # a list of dicts, etc.), so it must not be preferred here — doing
+        # so previously produced reasoning with no years and no skills for
+        # every candidate. Raw is only used to fill in anything `r` lacks.
+        cand_src = {**(raw_lookup or {}).get(cid, {}), **r}
         try:
             reason = generate_reason(cand_src, jd_profile, r)
         except Exception:

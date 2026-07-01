@@ -83,7 +83,7 @@ _SENIORITY_MAP: dict[str, str] = {
     "mid level"  : "mid",
     "intermediate": "mid",
     "senior"     : "senior",
-    "sr\."       : "senior",
+    "sr\\."      : "senior",
     "staff"      : "senior",
     "principal"  : "senior",
     "lead"       : "lead",
@@ -107,9 +107,24 @@ _REQUIRED_HEADERS = re.compile(
     re.IGNORECASE,
 )
 
-# Common location indicator phrases
+# Common location indicator phrases — stop at the first delimiter so we get
+# clean short phrases ("Pune/Noida") instead of run-on garbage swallowing the
+# rest of the sentence.
 _LOCATION_RE = re.compile(
-    r"\b(?:location|based in|office|remote|hybrid|on.?site)[:\s]+([A-Za-z ,/&()-]{3,60})",
+    r"\b(?:location|based in|office)[:\s]+"
+    r"([A-Za-z][A-Za-z /&-]{1,40}?)(?=[,.;|()\n]|\s{2}|$)",
+    re.IGNORECASE,
+)
+
+# High-precision fallback: known candidate cities this JD explicitly welcomes
+# ("Candidates in Hyderabad, Pune, Mumbai, Delhi NCR welcome to apply").
+# Catches cases the header-based regex above misses entirely.
+_KNOWN_CITIES = [
+    "pune", "noida", "hyderabad", "mumbai", "bangalore", "bengaluru",
+    "delhi ncr", "delhi", "gurugram", "gurgaon", "chennai", "kolkata",
+]
+_KNOWN_CITY_RE = re.compile(
+    r"\b(" + "|".join(re.escape(c) for c in _KNOWN_CITIES) + r")\b",
     re.IGNORECASE,
 )
 
@@ -121,7 +136,7 @@ _LOCATION_RE = re.compile(
 def _load_spacy() -> spacy.Language:
     """Load spaCy model; fall back with a clear error."""
     try:
-        nlp = spacy.load(SPACY_MODEL, disable=["parser", "lemmatizer"])
+        nlp = spacy.load(SPACY_MODEL, disable=["lemmatizer"])
         logger.debug("spaCy model '%s' loaded.", SPACY_MODEL)
         return nlp
     except OSError:
@@ -132,17 +147,30 @@ def _load_spacy() -> spacy.Language:
         raise
 
 
-def _read_docx(path: Path) -> str:
-    """Extract all paragraph text from a .docx, preserving newlines."""
-    print("=" * 50)
-    print("Current working directory:", os.getcwd())
-    print("Path object:", path)
-    print("Absolute path:", path.resolve())
-    print("Exists:", path.exists())
-    print("=" * 50)
+def _read_docx(path: Path) -> tuple[str, set[str]]:
+    """
+    Extract all paragraph text from a .docx, preserving newlines.
+
+    Also returns the set of paragraph texts that use a Word heading style
+    (Heading 1/2/3, Title), so `_split_sections()` can rely on real document
+    structure instead of guessing from word count / capitalisation (which
+    breaks on real-world JDs with long narrative headers like "Things we'd
+    like you to have but won't reject you for"). This is returned separately
+    (not inlined as text markers) so it doesn't interfere with the plain-text
+    regex/NLP extraction used everywhere else in this module.
+    """
     doc = docx.Document(str(path))
-    paragraphs = [para.text.strip() for para in doc.paragraphs]
-    return "\n".join(p for p in paragraphs if p)
+    lines: list[str] = []
+    heading_lines: set[str] = set()
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if not text:
+            continue
+        style_name = (para.style.name if para.style else "") or ""
+        if style_name.startswith("Heading") or style_name == "Title":
+            heading_lines.add(text)
+        lines.append(text)
+    return "\n".join(lines), heading_lines
 
 
 def _extract_experience(text: str) -> ExperienceRange | None:
@@ -181,26 +209,30 @@ def _extract_seniority(title: str, text: str) -> str:
     return "unknown"
 
 
-def _split_sections(text: str) -> dict[str, str]:
+def _split_sections(text: str, heading_lines: set[str] | None = None) -> dict[str, str]:
     """
-    Naively split JD text into labelled sections by scanning for common
-    header lines (all-caps words or title-cased short lines ending in ':').
+    Split JD text into labelled sections. Prefers real Word heading styles
+    (Heading 1/2/3, Title — passed in via `heading_lines` from `_read_docx`)
+    when available, since they're unambiguous; falls back to the word-count /
+    capitalisation heuristic for plain-text input or paragraphs with no style
+    info.
     Returns a dict of {header_text: section_body}.
     """
+    heading_lines = heading_lines or set()
     sections: dict[str, str] = {"_preamble": ""}
     current_header = "_preamble"
     lines = text.splitlines()
 
     for line in lines:
         stripped = line.strip()
-        # Heuristic: a header is ≤ 8 words, short, and has no period mid-line
-        if (
+        is_heading = stripped in heading_lines if heading_lines else (
             stripped
-            and len(stripped.split()) <= 8
+            and len(stripped.split()) <= 15
             and (stripped.isupper() or stripped.endswith(":") or (
-                stripped.istitle() and len(stripped) < 60
+                stripped.istitle() and len(stripped) < 90
             ))
-        ):
+        )
+        if is_heading:
             current_header = stripped.lower().rstrip(":")
             sections.setdefault(current_header, "")
         else:
@@ -213,6 +245,7 @@ def _extract_skills(
     text: str,
     nlp: spacy.Language,
     taxonomy: list[str],
+    heading_lines: set[str] | None = None,
 ) -> tuple[list[str], list[str]]:
     """
     Split text into 'required' vs 'preferred' sections, then match tech
@@ -220,7 +253,7 @@ def _extract_skills(
 
     Returns (mandatory_skills, preferred_skills).
     """
-    sections = _split_sections(text)
+    sections = _split_sections(text, heading_lines)
 
     required_text  : list[str] = []
     preferred_text : list[str] = []
@@ -285,8 +318,20 @@ def _extract_role_title(text: str, nlp: spacy.Language) -> str:
         r"(?:job\s+title|position|role|title)\s*[:\-]\s*(.+)",
         re.IGNORECASE,
     )
+    # Generic document-title / heading prefixes that aren't the role name
+    # itself (e.g. "Job Description: Senior AI Engineer — Founding Team").
+    # Without stripping this, the raw first line was previously returned
+    # verbatim, producing garbled downstream text like
+    # "experience in Job Description: Senior AI Engineer — Founding Team".
+    doc_title_re = re.compile(
+        r"^(?:job\s+description|jd|position\s+description|role\s+description)\s*[:\-]\s*(.+)",
+        re.IGNORECASE,
+    )
     for line in lines[:20]:
         m = title_prefix_re.match(line)
+        if m:
+            return m.group(1).strip()
+        m = doc_title_re.match(line)
         if m:
             return m.group(1).strip()
 
@@ -316,6 +361,13 @@ def _extract_locations(text: str, nlp: spacy.Language) -> list[str]:
         raw = m.group(1).strip().rstrip(".")
         if raw and raw.lower() not in ("the", "a", "an"):
             locations.append(raw)
+
+    # High-precision known-city hits (catches names mentioned outside a
+    # "Location:"-style header, e.g. "Candidates in Hyderabad, Pune, ... welcome")
+    for m in _KNOWN_CITY_RE.finditer(text):
+        city = m.group(1).strip()
+        if city not in locations:
+            locations.append(city)
 
     # spaCy GPE / LOC entities
     try:
@@ -370,7 +422,7 @@ def parse_jd(path: Path | str | None = None) -> JDProfile:
 
     # ── Read DOCX ─────────────────────────────────────────────────────────────
     try:
-        raw_text = _read_docx(jd_path)
+        raw_text, heading_lines = _read_docx(jd_path)
     except FileNotFoundError:
         raise FileNotFoundError(f"JD file not found: {jd_path}")
     except Exception as exc:
@@ -400,7 +452,7 @@ def parse_jd(path: Path | str | None = None) -> JDProfile:
 
     try:
         mandatory_skills, preferred_skills = _extract_skills(
-            raw_text, nlp, TECH_TAXONOMY
+            raw_text, nlp, TECH_TAXONOMY, heading_lines
         )
     except Exception as exc:
         logger.warning("Skill extraction failed: %s", exc)

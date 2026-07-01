@@ -178,15 +178,22 @@ def execute_pipeline(
             raw_cand  = raw_lookup.get(cid, {})
             features  = features_lookup.get(cid, {})
 
+            profile = raw_cand.get("profile") or {}
+
             r["reasoning"]               = reason
             r["name"]                    = (
-                raw_cand.get("name") or raw_cand.get("full_name") or cid
+                raw_cand.get("name") or raw_cand.get("full_name") or
+                profile.get("anonymized_name") or cid
             )
-            r["company"]                 = _latest_company(raw_cand)
-            r["role"]                    = _latest_title(raw_cand)
+            r["company"]                 = (
+                _latest_company(raw_cand) or profile.get("current_company") or ""
+            )
+            r["role"]                    = (
+                _latest_title(raw_cand) or profile.get("current_title") or "Unknown role"
+            )
             r["location"]                = (
-                raw_cand.get("location") or raw_cand.get("city") or
-                raw_cand.get("current_location") or "Unknown"
+                profile.get("location") or raw_cand.get("location") or
+                raw_cand.get("city") or raw_cand.get("current_location") or "Unknown"
             )
             r["remote"]                  = bool(
                 raw_cand.get("remote_ok") or raw_cand.get("open_to_remote")
@@ -213,9 +220,12 @@ def execute_pipeline(
 
 def _latest_title(raw_candidate: dict[str, Any]) -> str:
     """Best-effort extraction of the candidate's most recent job title."""
-    exps = raw_candidate.get("work_experience", []) or []
+    profile = raw_candidate.get("profile") or {}
+    if profile.get("current_title"):
+        return profile["current_title"]
+    exps = raw_candidate.get("career_history") or raw_candidate.get("work_experience") or []
     if not exps:
-        return raw_candidate.get("headline") or "Unknown role"
+        return profile.get("headline") or raw_candidate.get("headline") or "Unknown role"
     try:
         latest = sorted(
             exps,
@@ -229,7 +239,10 @@ def _latest_title(raw_candidate: dict[str, Any]) -> str:
 
 def _latest_company(raw_candidate: dict[str, Any]) -> str:
     """Best-effort extraction of the candidate's most recent employer."""
-    exps = raw_candidate.get("work_experience", []) or []
+    profile = raw_candidate.get("profile") or {}
+    if profile.get("current_company"):
+        return profile["current_company"]
+    exps = raw_candidate.get("career_history") or raw_candidate.get("work_experience") or []
     if not exps:
         return ""
     try:
