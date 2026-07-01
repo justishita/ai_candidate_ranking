@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RedRob — AI Candidate Ranking</title>
+<title> AI Candidate Ranking</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
@@ -716,6 +716,19 @@ function escapeHtml(s){
   const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML;
 }
 
+function normalizeSearchText(text){
+  return (text||'').toString().toLowerCase()
+    .normalize('NFD')
+    .replace(/[ -]/g, '')
+    .replace(/[-	
+-
+]/g, '')
+    .replace(/[ -]/g, '')
+    .replace(/[-]/g, '')
+    .replace(/[ -]/g, '')
+    .replace(/[ -]/g, '');
+}
+
 /* ════════════════════════════════════════════════════════════════════════
    Filter / sort / render
    ════════════════════════════════════════════════════════════════════════ */
@@ -739,14 +752,20 @@ function render(){
     document.getElementById('kTotal').textContent=0;
     return;
   }
-  const q=searchTerm.toLowerCase();
+  const q = normalizeSearchText(searchTerm);
+  const qTokens = splitSearchTokens(searchTerm);
   let shown=0;
   const sorted=getSorted(candidates);
   sorted.forEach((c)=>{
-    const nameMatch=!q||c.name.toLowerCase().includes(q)||c.role.toLowerCase().includes(q)||c.id.toLowerCase().includes(q)||c.skills.some(s=>s.toLowerCase().includes(q))||c.softSkills.some(s=>s.toLowerCase().includes(q));
+    const fields = [c.name, c.role, c.company, c.loc, c.id].concat(c.skills, c.softSkills);
+    const nameMatch = !q ||
+      qTokens.some(token =>
+        fields.some(field => fuzzyMatchTerm(token, field)) ||
+        LOCAL_BANGALORE_ALIASES.some(alias => levenshtein(token, alias) <= 2)
+      );
     if(!nameMatch)return;
     if(activeFilter==='remote'&&!c.remote)return;
-    if(activeFilter==='local'&&!c.loc.toLowerCase().includes('bangalore'))return;
+    if(activeFilter==='local' && !isBangaloreLocation(c.loc)) return;
     if(activeFilter==='top80'&&c.score<=0.80)return;
     if(activeFilter==='phd'&&!c.phd)return;
     shown++;
