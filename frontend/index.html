@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title> AI Candidate Ranking</title>
+<title>RedRob — AI Candidate Ranking</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
@@ -220,7 +220,7 @@ html,body{height:100%;background:var(--navy);color:var(--text);font-family:var(-
     <div class="top-right">
       <span class="badge badge-live" id="runStatusBadge"><i class="ti ti-circle-filled" style="font-size:8px;vertical-align:1px"></i> Idle</span>
       <span class="badge badge-warn" id="downloadBadge" style="display:none">submission.csv ready</span>
-      <div class="top-avatar" title="Account">AK</div>
+      <div class="top-avatar" title="Account">U</div>
     </div>
   </header>
 
@@ -518,7 +518,7 @@ async function loadResults(){
     if(err.message && err.message.includes('No completed run')){
       // Expected on first load before any run — show empty state quietly.
       document.getElementById('candList').innerHTML =
-        `<div class="empty-state"><i class="ti ti-player-play"></i><p>No results yet. Set file paths in the sidebar and click "Run pipeline".</p></div>`;
+        `<div class="empty-state"><i class="ti ti-player-play"></i><p>Click "Run pipeline".</p></div>`;
     } else {
       showToast(err.message || 'Failed to load results','ti-alert-circle');
     }
@@ -716,19 +716,6 @@ function escapeHtml(s){
   const d=document.createElement('div'); d.textContent=s??''; return d.innerHTML;
 }
 
-function normalizeSearchText(text){
-  return (text||'').toString().toLowerCase()
-    .normalize('NFD')
-    .replace(/[ -]/g, '')
-    .replace(/[-	
--
-]/g, '')
-    .replace(/[ -]/g, '')
-    .replace(/[-]/g, '')
-    .replace(/[ -]/g, '')
-    .replace(/[ -]/g, '');
-}
-
 /* ════════════════════════════════════════════════════════════════════════
    Filter / sort / render
    ════════════════════════════════════════════════════════════════════════ */
@@ -747,25 +734,19 @@ function render(){
   const list=document.getElementById('candList');
   list.innerHTML='';
   if(candidates.length===0){
-    list.innerHTML=`<div class="empty-state"><i class="ti ti-player-play"></i><p>No results yet. Set file paths in the sidebar and click "Run pipeline".</p></div>`;
+    list.innerHTML=`<div class="empty-state"><i class="ti ti-player-play"></i><p>Click on "Run pipeline".</p></div>`;
     document.getElementById('showCount').textContent=0;
     document.getElementById('kTotal').textContent=0;
     return;
   }
-  const q = normalizeSearchText(searchTerm);
-  const qTokens = splitSearchTokens(searchTerm);
+  const q=searchTerm.toLowerCase();
   let shown=0;
   const sorted=getSorted(candidates);
   sorted.forEach((c)=>{
-    const fields = [c.name, c.role, c.company, c.loc, c.id].concat(c.skills, c.softSkills);
-    const nameMatch = !q ||
-      qTokens.some(token =>
-        fields.some(field => fuzzyMatchTerm(token, field)) ||
-        LOCAL_BANGALORE_ALIASES.some(alias => levenshtein(token, alias) <= 2)
-      );
+    const nameMatch=!q||c.name.toLowerCase().includes(q)||c.role.toLowerCase().includes(q)||c.company.toLowerCase().includes(q)||c.loc.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)||c.skills.some(s=>s.toLowerCase().includes(q))||c.softSkills.some(s=>s.toLowerCase().includes(q));
     if(!nameMatch)return;
     if(activeFilter==='remote'&&!c.remote)return;
-    if(activeFilter==='local' && !isBangaloreLocation(c.loc)) return;
+    if(activeFilter==='local'&&!c.loc.toLowerCase().includes('bangalore'))return;
     if(activeFilter==='top80'&&c.score<=0.80)return;
     if(activeFilter==='phd'&&!c.phd)return;
     shown++;
